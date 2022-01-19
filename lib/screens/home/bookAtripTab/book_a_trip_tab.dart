@@ -24,12 +24,12 @@ class _BookATripTabState extends State<BookATripTab> {
     fetchToAndFromCities();
   }
 
-  var fromCitiesJson;
-  var toCitiesJson;
+  List<DropdownMenuItem<String>> fromCitiesList = [];
+  List<DropdownMenuItem<String>> toCitiesList = [];
   int cityFromSelectedId = 0;
   int cityToSelectedId = 0;
-  var cityFromSelectedName ;
-  var cityToSelectedName ;
+  var cityFromSelectedName = null ;
+  var cityToSelectedName = null;
   DateTime _dateTime = DateTime.now();
   DateTime _returnDateTime = DateTime.now();
   bool addReturnTripSelected = false;
@@ -91,7 +91,7 @@ class _BookATripTabState extends State<BookATripTab> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(screenWidth * 3)),
       child: DropdownButtonHideUnderline(
-          child: DropdownButton(
+          child: DropdownButton<String>(
               icon: SizedBox(
                 height: screenWidth * 3,
                 width: screenWidth * 3,
@@ -104,8 +104,7 @@ class _BookATripTabState extends State<BookATripTab> {
               style: TextStyle(color: Colors.grey.shade900, fontSize: 13),
               hint: Text(
                   cityFromSelectedId == 0
-                      ? 'Leaving From'
-                      : cityFromSelectedName,
+                      ? 'Leaving From' : '',
                   style: TextStyle(
                       color: cityFromSelectedId == 0
                           ? Colors.grey.shade400
@@ -119,12 +118,7 @@ class _BookATripTabState extends State<BookATripTab> {
               },
             value: cityFromSelectedName,
 
-            items: fromCitiesJson?.map<DropdownMenuItem>((item) {
-              return new DropdownMenuItem(
-                child: new Text(item['name']),
-                value: item['id'].toString(),
-              );
-            }).toList()?? [],
+            items: fromCitiesList,
           )),
     );
   }
@@ -132,29 +126,42 @@ class _BookATripTabState extends State<BookATripTab> {
   Widget goingToField(screenWidth) {
     return Container(
       height: screenWidth * 12.5,
-      padding: EdgeInsets.only(left: screenWidth * 3),
+      padding: EdgeInsets.only(left: screenWidth * 3, right: screenWidth * 3),
+      margin: EdgeInsets.only(bottom: screenWidth * 3),
+      width: double.infinity,
       decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(screenWidth * 3)),
-      child: TextField(
-        style:
-        TextStyle(color: Colors.grey.shade800, fontSize: screenWidth * 3.5),
-        decoration: InputDecoration(
-            border: InputBorder.none,
-            suffixIcon: SizedBox(
-              height: screenWidth * 1,
+      child: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            icon: SizedBox(
+              height: screenWidth * 3,
               width: screenWidth * 3,
               child: Image.asset(
                 'assets/location_icon.png',
                 fit: BoxFit.contain,
               ),
             ),
-            suffixIconConstraints: BoxConstraints(
-                minWidth: screenWidth * 10, minHeight: screenWidth * 4),
-            hintText: 'Going To',
-            hintStyle: TextStyle(
-                color: Colors.grey.shade400, fontSize: screenWidth * 3.5)),
-      ),
+            isExpanded: true,
+            style: TextStyle(color: Colors.grey.shade900, fontSize: 13),
+            hint: Text(
+                cityToSelectedId == 0
+                    ? 'Going To' : '',
+                style: TextStyle(
+                    color: cityToSelectedId == 0
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade800,
+                    fontSize: screenWidth * 3.5)),
+            onChanged: (val) {
+              setState(() {
+                cityToSelectedId =  int.parse(val.toString());
+                cityToSelectedName = val;
+              });
+            },
+            value: cityToSelectedName,
+
+            items: toCitiesList,
+          )),
     );
   }
 
@@ -386,12 +393,33 @@ class _BookATripTabState extends State<BookATripTab> {
     if (response.statusCode == 200) {
       var jsonData = jsonDecode(response.body);
 
-      fromCitiesJson = jsonData["From_Buses"];
-      toCitiesJson = jsonData["To_Buses"];
+      var fromCitiesJson = jsonData["From_Buses"];
+      var toCitiesJson = jsonData["To_Buses"];
+      List<DropdownMenuItem<String>> fromCitiesListLocal = [];
+      List<DropdownMenuItem<String>> toCitiesListLocal = [];
+      for(var item in fromCitiesJson) {
+        DropdownMenuItem<String> city = new DropdownMenuItem<String>(
+          child: new Text(item['name']),
+          value: item['id'].toString(),
+        );
+        fromCitiesListLocal.add((city));
+      }
+
+      for(var item in toCitiesJson) {
+        DropdownMenuItem<String> city = new DropdownMenuItem<String>(
+          child: new Text(item['name']),
+          value: item['id'].toString(),
+        );
+        toCitiesListLocal.add((city));
+      }
+      setState(() {
+        fromCitiesList = fromCitiesListLocal;
+        toCitiesList = toCitiesListLocal;
+      });
 
     }
     else{
-      AlertDialog("Connection Error!");
+      //AlertDialog("Connection Error!");
     }
   }
 }
