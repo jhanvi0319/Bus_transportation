@@ -47,10 +47,10 @@ class _DiscountDropDownState extends State<DiscountDropDown> {
                 });
               },
               items: [
-            for (int i = 0; i < listOfDiscounts.length; i++)
-              DropdownMenuItem(
-                  value: listOfDiscounts[i], child: Text(listOfDiscounts[i]))
-          ])),
+                for (int i = 0; i < listOfDiscounts.length; i++)
+                  DropdownMenuItem(
+                      value: listOfDiscounts[i], child: Text(listOfDiscounts[i]))
+              ])),
     );
   }
 }

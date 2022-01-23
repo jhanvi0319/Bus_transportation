@@ -1,12 +1,26 @@
+import 'dart:convert';
+
 import 'package:buenos_transportation/globalWidgets/textWidget/text_widget.dart';
 import 'package:buenos_transportation/responsiveBloc/size_config.dart';
 import 'package:buenos_transportation/theme/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 
 class SelectDeparture extends StatefulWidget {
-  const SelectDeparture({Key? key}) : super(key: key);
+  final String? cityFromData;
+  final String? cityToData;
+  final String? selectedDateDeparture;
+
+  const SelectDeparture(
+      {Key? key,
+        this.cityFromData,
+        this.cityToData,
+        this.selectedDateDeparture
+      }) : super(key: key);
 
   @override
   _SelectDepartureState createState() => _SelectDepartureState();
@@ -15,53 +29,89 @@ class SelectDeparture extends StatefulWidget {
 class _SelectDepartureState extends State<SelectDeparture> {
   int _selectedIndex = 1;
   int focusedDateBlock = 1;
+  String resultFetch = 'fetching';
+  String fromCity = '';
+  String toCity = '';
+  String date = '';
+  var buses = [];
+
+
+  @override
+  void initState() {
+    super.initState();
+    fetchSearchBuses();
+  }
+
   @override
   Widget build(BuildContext context) {
     var screenWidth = SizeConfig.widthMultiplier;
+    if (resultFetch == 'fetching') {
+      return SafeArea(
+        child: Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
+    } else if (resultFetch == 'failed') {
+      SchedulerBinding.instance?.addPostFrameCallback((_) {
+        // make pop action to next cycle
+        Navigator.pop(context);
+      });
+    } else {
+      return SafeArea(
+        child: Scaffold(
+          // bottomNavigationBar: bottomNavigationBar(screenWidth),
+            backgroundColor: Colors.white,
+            extendBodyBehindAppBar: true,
+            appBar: appBar(screenWidth),
+            body: Container(
+              height: double.infinity,
+              width: double.infinity,
+              padding: EdgeInsets.fromLTRB(
+                  screenWidth * 6, screenWidth * 6, screenWidth * 6, 0),
+              color: theme.blueColor,
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    SizedBox(
+                      height: screenWidth * 17,
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        text(fromCity, screenWidth * 3.3, Colors.white,
+                            fontWeight: FontWeight.w600),
+                        Icon(
+                          Icons.arrow_forward_ios,
+                          color: Colors.white,
+                          size: screenWidth * 4,
+                        ),
+                        text(toCity, screenWidth * 3.3, Colors.white,
+                            fontWeight: FontWeight.w600)
+                      ],
+                    ),
+                    SizedBox(
+                      height: screenWidth * 4,
+                    ),
+                    dateSelection(screenWidth),
+                    SizedBox(
+                      height: screenWidth * 4,
+                    ),
+                    for (int i = 0; i < buses.length; i++)
+                      detailsBlock(screenWidth, buses[i])
+                  ],
+                ),
+              ),
+            )),
+      );
+    }
     return SafeArea(
       child: Scaffold(
-          bottomNavigationBar: bottomNavigationBar(screenWidth),
-          backgroundColor: Colors.white,
-          extendBodyBehindAppBar: true,
-          appBar: appBar(screenWidth),
-          body: Container(
-            height: double.infinity,
-            width: double.infinity,
-            padding: EdgeInsets.fromLTRB(
-                screenWidth * 6, screenWidth * 6, screenWidth * 6, 0),
-            color: theme.blueColor,
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  SizedBox(
-                    height: screenWidth * 17,
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      text('Utica (e), NY', screenWidth * 3.3, Colors.white,
-                          fontWeight: FontWeight.w600),
-                      Icon(
-                        Icons.arrow_forward_ios,
-                        color: Colors.white,
-                        size: screenWidth * 4,
-                      ),
-                      text('Jacksonville, FL', screenWidth * 3.3, Colors.white,
-                          fontWeight: FontWeight.w600)
-                    ],
-                  ),
-                  SizedBox(
-                    height: screenWidth * 4,
-                  ),
-                  dateSelection(screenWidth),
-                  SizedBox(
-                    height: screenWidth * 4,
-                  ),
-                  for (int i = 0; i < 4; i++) detailsBlock(screenWidth)
-                ],
-              ),
-            ),
-          )),
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      ),
     );
   }
 
@@ -228,7 +278,18 @@ class _SelectDepartureState extends State<SelectDeparture> {
     );
   }
 
-  Widget detailsBlock(screenWidth) {
+  Widget detailsBlock(screenWidth, bus) {
+    String localDestTime = bus["departure_time"];
+    String localArrTime = bus["arrival_time"];
+    var destTimeArray = localDestTime.split(":");
+    var arrTimeArray = localArrTime.split(":");
+    var destAMPM =
+    destTimeArray[2].replaceAll(new RegExp(r'\d'), '').toUpperCase();
+    var arrAMPM =
+    arrTimeArray[2].replaceAll(new RegExp(r'\d'), '').toUpperCase();
+
+    List<DropdownMenuItem<String>> classList = [];
+
     return Container(
       margin: EdgeInsets.only(bottom: screenWidth * 3),
       padding: EdgeInsets.all(screenWidth * 2),
@@ -241,133 +302,149 @@ class _SelectDepartureState extends State<SelectDeparture> {
         children: [
           Expanded(
               child: Row(
-            children: [
-              Expanded(
-                  child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                    screenWidth * 2, screenWidth * 2, screenWidth * 2, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
+                children: [
+                  Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(
+                            screenWidth * 2, screenWidth * 2, screenWidth * 2, 0),
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            text(
-                                'Departure', screenWidth * 3.2, theme.blueColor,
-                                fontWeight: FontWeight.w400),
-                            text('12:50', screenWidth * 4.2,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    text(
+                                        'Departure', screenWidth * 3.2, theme.blueColor,
+                                        fontWeight: FontWeight.w400),
+
+                                    text(
+                                        (destTimeArray[0] +
+                                            ":" +
+                                            destTimeArray[1] +
+                                            destAMPM),
+                                        screenWidth * 4.2,
+                                        Colors.grey.shade800,
+                                        fontWeight: FontWeight.w700),
+                                    // DateFormat('hh:mm:ss').format(DateTime.now());
+                                    text(date, screenWidth * 2.3, theme.blueColor,
+                                        fontWeight: FontWeight.w400),
+                                  ],
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    text('Arrival', screenWidth * 3.2, theme.blueColor,
+                                        fontWeight: FontWeight.w400),
+                                    text(
+                                        (arrTimeArray[0] +
+                                            ":" +
+                                            arrTimeArray[1] +
+                                            arrAMPM),
+                                        // text(DateFormat('h:mm a').format(
+                                        //     DateTime.parse(bus["arrival_time"])),
+                                        screenWidth * 4.2,
+                                        Colors.grey.shade800,
+                                        fontWeight: FontWeight.w700),
+                                    text(date, screenWidth * 2.3, theme.blueColor,
+                                        fontWeight: FontWeight.w400),
+                                  ],
+                                )
+                              ],
+                            ),
+                            SizedBox(height: screenWidth * 3),
+                            text(bus["duration"], screenWidth * 2.4,
                                 Colors.grey.shade800,
-                                fontWeight: FontWeight.w700),
-                            text('Sun Oct 31', screenWidth * 2.3,
-                                theme.blueColor,
                                 fontWeight: FontWeight.w400),
-                          ],
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            text('Arrival', screenWidth * 3.2, theme.blueColor,
+                            SizedBox(height: screenWidth * 2),
+                            text('2 Transfers', screenWidth * 2.4, theme.blueColor,
                                 fontWeight: FontWeight.w400),
-                            text('12:50', screenWidth * 4.2,
-                                Colors.grey.shade800,
-                                fontWeight: FontWeight.w700),
-                            text('Mon Nov 25', screenWidth * 2.3,
-                                theme.blueColor,
+                            text(bus["route_name"], screenWidth * 2.4, theme.blueColor,
                                 fontWeight: FontWeight.w400),
-                          ],
-                        )
-                      ],
-                    ),
-                    SizedBox(height: screenWidth * 3),
-                    text('1 day 9 hours 45 minutes', screenWidth * 2.4,
-                        Colors.grey.shade800,
-                        fontWeight: FontWeight.w400),
-                    SizedBox(height: screenWidth * 2),
-                    text('2 Transfers', screenWidth * 2.4, theme.blueColor,
-                        fontWeight: FontWeight.w400),
-                    text('Schedule #0253', screenWidth * 2.4, theme.blueColor,
-                        fontWeight: FontWeight.w400),
-                    SizedBox(height: screenWidth * 3),
-                    Row(
-                      children: [
-                        SizedBox(
-                          height: screenWidth * 4,
-                          width: screenWidth * 4,
-                          child: Image.asset(
-                            'assets/wifi_icon.png',
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                        SizedBox(width: screenWidth),
-                        SizedBox(
-                          height: screenWidth * 3.7,
-                          width: screenWidth * 3.7,
-                          child: Image.asset(
-                            'assets/switch_icon.png',
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                        SizedBox(width: screenWidth),
-                        SizedBox(
-                          height: screenWidth * 3.7,
-                          width: screenWidth * 3.7,
-                          child: Image.asset(
-                            'assets/seat_icon.png',
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      ],
-                    )
-                  ],
-                ),
-              )),
-              Expanded(
-                  child: Align(
-                alignment: Alignment.topCenter,
-                child: Container(
-                  padding: EdgeInsets.all(screenWidth * 3),
-                  margin: EdgeInsets.all(3),
-                  height: screenWidth * 28,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                      color: theme.redColor,
-                      borderRadius: BorderRadius.circular(screenWidth * 3)),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      text('Economy', screenWidth * 3.5, Colors.white,
-                          fontWeight: FontWeight.w400),
-                      text('Average Fare / person', screenWidth * 2.3,
-                          Colors.white,
-                          fontWeight: FontWeight.w400),
-                      text('\$287', screenWidth * 5, Colors.white,
-                          fontWeight: FontWeight.w500),
-                      Spacer(),
-                      Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            text('View All Fares', screenWidth * 2.3,
-                                Colors.white,
-                                fontWeight: FontWeight.w400),
-                            SizedBox(
-                              height: screenWidth * 3,
-                              width: screenWidth * 3,
-                              child: Image.asset(
-                                'assets/expand_arrow_down_icon.png',
-                                fit: BoxFit.contain,
-                                color: Colors.white,
-                              ),
+                            SizedBox(height: screenWidth * 3),
+                            Row(
+                              children: [
+                                SizedBox(
+                                  height: screenWidth * 4,
+                                  width: screenWidth * 4,
+                                  child: Image.asset(
+                                    'assets/wifi_icon.png',
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                                SizedBox(width: screenWidth),
+                                SizedBox(
+                                  height: screenWidth * 3.7,
+                                  width: screenWidth * 3.7,
+                                  child: Image.asset(
+                                    'assets/switch_icon.png',
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                                SizedBox(width: screenWidth),
+                                SizedBox(
+                                  height: screenWidth * 3.7,
+                                  width: screenWidth * 3.7,
+                                  child: Image.asset(
+                                    'assets/seat_icon.png',
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                              ],
                             )
-                          ])
-                    ],
-                  ),
-                ),
-              ))
-            ],
-          )),
+                          ],
+                        ),
+                      )),
+
+                  Expanded(
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: Container(
+                          padding: EdgeInsets.all(screenWidth * 3),
+                          margin: EdgeInsets.all(3),
+                          height: screenWidth * 28,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                              color: theme.redColor,
+                              borderRadius: BorderRadius.circular(screenWidth * 3)),
+                          child: InkWell(
+                            onTap: (){},
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                text(bus["tickets_dropdown"][0]["ticket"], screenWidth * 3.5, Colors.white,
+                                    fontWeight: FontWeight.w400),
+                                text('Average Fare / person', screenWidth * 2.3,
+                                    Colors.white,
+                                    fontWeight: FontWeight.w400),
+                                text('\$'+bus["tickets_dropdown"][0]["price"], screenWidth * 5, Colors.white,
+                                    fontWeight: FontWeight.w500),
+                                Spacer(),
+                                Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      text('View All Fares', screenWidth * 2.3,
+                                          Colors.white,
+                                          fontWeight: FontWeight.w400),
+                                      SizedBox(
+                                        height: screenWidth * 3,
+                                        width: screenWidth * 3,
+                                        child: Image.asset(
+                                          'assets/expand_arrow_down_icon.png',
+                                          fit: BoxFit.contain,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    ])
+                              ],
+                            ),
+                          ),
+                        ),
+                      ))
+                ],
+              )),
           SizedBox(
             height: screenWidth * 7,
             width: double.infinity,
@@ -400,4 +477,50 @@ class _SelectDepartureState extends State<SelectDeparture> {
       ),
     );
   }
+
+  void fetchSearchBuses() async {
+    try{
+      var bodyData = {
+        "pickup_id" : widget.cityToData,
+        "return_id" : widget.cityFromData,
+        "date" : widget.selectedDateDeparture
+      };
+      var response = await http.post(Uri.parse("https://buenoexpresstransport.com/admin/index.php?controller=pjAPI&action=GetBusListAPI"),body: bodyData);
+      var jsonData = jsonDecode(response.body);
+      if (jsonData == null) {
+        setState(() {
+          resultFetch = 'failed';
+        });
+      } else {
+        if (jsonData["code"] == 100) {
+          setState(() {
+            resultFetch = 'failed';
+            //alert no Buses found
+          });
+        }
+        var fromCityLocal = '';
+        var toCityLocal = '';
+        String departureTime = '';
+        for (var bus in jsonData["buses_list"]) {
+          fromCityLocal = bus["from_location"];
+          toCityLocal = bus["to_location"];
+          break;
+        }
+        setState(() {
+          fromCity = fromCityLocal;
+          toCity = toCityLocal;
+          resultFetch = 'success';
+          buses = jsonData["buses_list"];
+          date = DateFormat('EEEE, d MMM')
+              .format(DateFormat('dd-MM-yyyy').parse(jsonData["date"]));
+        });
+      }
+    }
+    catch(ex){
+      setState(() {
+        resultFetch = 'failed';
+      });
+    }
+  }
+
 }

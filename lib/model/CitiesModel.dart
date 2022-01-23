@@ -8,19 +8,19 @@ class CitiesList {
     if (json['From_Buses'] != null) {
       fromBuses = <FromBuses>[];
       json['From_Buses'].forEach((v) {
-        fromBuses!.add(new FromBuses.fromJson(v));
+        fromBuses!.add( FromBuses.fromJson(v));
       });
     }
     if (json['To_Buses'] != null) {
       toBuses = <ToBuses>[];
       json['To_Buses'].forEach((v) {
-        toBuses!.add(new ToBuses.fromJson(v));
+        toBuses!.add( ToBuses.fromJson(v));
       });
     }
   }
 
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = new Map<String, dynamic>();
+    final Map<String, dynamic> data =  Map<String, dynamic>();
     if (this.fromBuses != null) {
       data['From_Buses'] = this.fromBuses!.map((v) => v.toJson()).toList();
     }
